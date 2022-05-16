@@ -1,0 +1,2 @@
+# crarima
+crypto arima bot
