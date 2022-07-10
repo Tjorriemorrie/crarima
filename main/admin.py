@@ -1,3 +1,9 @@
 from django.contrib import admin
 
-# Register your models here.
+from main.models import Ticker
+
+
+@admin.register(Ticker)
+class TickerAdmin(admin.ModelAdmin):
+    list_display = ['tick_at', 'price', 'btc', 'xmr']
+    ordering = ['-tick_at']

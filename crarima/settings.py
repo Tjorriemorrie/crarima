@@ -9,7 +9,8 @@ https://docs.djangoproject.com/en/4.0/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.0/ref/settings/
 """
-
+import sys
+from os import getenv
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -39,6 +40,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     'main.apps.MainConfig',
+    'kc.apps.KcConfig',
 ]
 
 MIDDLEWARE = [
@@ -123,3 +125,94 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/4.0/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+# logging
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'standard': {
+            'format': '%(asctime)s %(levelname)-8s %(name)s - %(message)s',
+        },
+        'compact': {
+            'format': '%(asctime)s %(levelname)s - %(message)s',
+        }
+    },
+    'handlers': {
+        'django': {
+            'level': 'DEBUG',
+            # 'class': 'logging.StreamHandler',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': BASE_DIR / 'logs' / 'django.log',
+            'when': 'midnight',
+            'backupCount': 7,
+            'delay': True,
+            'formatter': 'standard',
+        },
+        'default': {
+            'level': 'DEBUG',
+            # 'class': 'logging.StreamHandler',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': BASE_DIR / 'logs' / 'default.log',
+            'when': 'midnight',
+            'backupCount': 7,
+            'delay': True,
+            'formatter': 'standard',
+        },
+        'main': {
+            'level': 'DEBUG',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': BASE_DIR / 'logs' / 'main.log',
+            'when': 'midnight',
+            'backupCount': 7,
+            'delay': True,
+            'formatter': 'standard',
+        },
+        'kc': {
+            'level': 'DEBUG',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': BASE_DIR / 'logs' / 'kc.log',
+            'when': 'midnight',
+            'backupCount': 7,
+            'delay': True,
+            'formatter': 'standard',
+        },
+        'console': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+            'stream': sys.stdout,
+            'formatter': 'compact',
+        },
+    },
+    'loggers': {
+        '': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+        'main': {
+            'handlers': ['default', 'console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'kc': {
+            'handlers': ['default', 'console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'django': {
+            'handlers': ['django'],
+            'level': 'DEBUG',
+            'propagate': False,
+        }
+    }
+}
+
+
+KUCOIN_CREDS_SANDBOX = {
+    'is_sandbox': True,
+    'key': getenv('KUCOIN_KEY'),
+    'secret': getenv('KUCOIN_SECRET'),
+    'passphrase': getenv('KUCOIN_PASSPHRASE'),
+}
