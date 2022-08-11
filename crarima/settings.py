@@ -41,6 +41,7 @@ INSTALLED_APPS = [
 
     'main.apps.MainConfig',
     'kc.apps.KcConfig',
+    'to.apps.ToConfig',
 ]
 
 MIDDLEWARE = [
@@ -178,6 +179,15 @@ LOGGING = {
             'delay': True,
             'formatter': 'standard',
         },
+        'to': {
+            'level': 'DEBUG',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': BASE_DIR / 'logs' / 'to.log',
+            'when': 'midnight',
+            'backupCount': 7,
+            'delay': True,
+            'formatter': 'standard',
+        },
         'console': {
             'level': 'INFO',
             'class': 'logging.StreamHandler',
@@ -197,7 +207,12 @@ LOGGING = {
             'propagate': False,
         },
         'kc': {
-            'handlers': ['default', 'console'],
+            'handlers': ['kc', 'console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'to': {
+            'handlers': ['to', 'console'],
             'level': 'DEBUG',
             'propagate': False,
         },

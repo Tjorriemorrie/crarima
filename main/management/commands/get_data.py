@@ -12,5 +12,5 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         logger.info('Getting data...')
-        get_data(delta=False)
+        get_data()
         logger.info('done')

@@ -1,6 +1,8 @@
 import logging
-from random import random, shuffle
+from collections import deque
+from copy import deepcopy
 
+import numpy as np
 import pandas as pd
 from cma import CMAOptions, CMAEvolutionStrategy
 from django_pandas.io import read_frame
@@ -12,103 +14,91 @@ logger = logging.getLogger(__name__)
 
 
 def run_sim():
-    # 0.64  2.64  0.002   211%   signal must be smaller than base
-    # 0.35  0.47  0.499   211%   random invest amount
-    # 0.10  1.02  0.001   219%   invest now 5-15 and cutoff is 1%
-    # 0.33  3.89  0.001   123%   changed moving to exponential REVERTED
-    # 0.20  0.43  0.001   498%   added BNB
-    # 0.98  3.99  0.001   527%   cutoff back to 100
-    # 0.97  3.77  0.002   480%   rounding signal and base to 10s
-    # 0.31  3.85  0.002   247%   take minimum crypto return for ROI
-    # 0.39  3.80  0.001   225%   invest now between 10-20k
-    # 0.49  0.80  0.001   225%   added ADA
-    # 0.93  3.99  0.025    88%   added SOL
-    # 0.11  1.68  0.001  1428%   changed to avg returns of all instead of worst
-    # 0.99  3.99  0.016   593%   changed min perc to 0001
-    # 0.21  3.80  0.0432  322%   changed sigma back to 10  REVERTED
-    # 1.00  4.00  0.0161  593%   bumping min amount to cutoff for trade (now balances will deplete)
-    # 1.00  3.99  0.0159  594%   invest fixed to 20_000
-    # 2.21  6.90  0.1000  593%   upped avg limits
-    # 1.67  6.92  0.100  1352%   upped min perc to 0.001
-    # 4.7  6.9  0.200   1498%   upped max perc to 20%
-    # 2.5  6.9  0.200   1498%   perc rounding to 2 digits (using whole percentages [min then 0.01])
-    # 2.3  9.9  0.200   1.74   378%   added participation
-    # 3.1  5.5  0.07   0.69   1066%   changed participation to number of trades made (removes long N/A base values and empty wallets)
-    # 2.0  6.8  0.12   0.62   1356%   max params set to max data available
-    # 0.3  0.9  0.01   0.67   516%   fixed opening coin balance
-    # 1.1  1.7  0.01   1.18   994%   added doge
-    # 1.0  7.2  0.003   -0.01   -26%   perc now 0.0001 to 0.10  REVERTED
-    # 0.2  0.7  0.01   0.90   679%   timeout set to 1 hour
-    # 0.3  0.8  0.01   0.87   661%   added tron
-    # 1.5  1.7  0.01   1.10   928%   sigma 6
-    # 0.4  1.8  0.01   0.85   772%   sigma 7
-    # 0.1  0.8  0.01   0.87   657%   sigma 5
-    # 0.3  0.8  0.01   0.87   661%   sigma 8
-    # 0.1  0.4  0.02   0.18   137%   dropped SOL & gain over DCA
-    # 2.5  3.6  0.07   0.03   41%   DCA start balance is *2
-    # 0.10  0.41  0.02   0.51   377%   removed rounding
-    # 0.36  0.40  0.02   0.53   390%   base min lowered to 20
-    # 0.10  0.40  0.02   0.52   383%   rerun
-    # 0.93  1.69  0.01   1.36   1146%   added matic
-    # 0.64  1.71  0.01   1.27   1067%   rerun
-    # 0.30  1.66  0.012   1.26   1062%   halved min perc - now 0.005 from 0.01
-    # 0.93  1.67  0.013   1.39   1166%   rerun
-    # 1.00  1.67  0.014   1.40   1173%   rerun
-    # 0.92  1.67  0.013   1.22   1027%   added ltc
-    # 0.98  3.96  0.059   0.12   137%   coins are now a daily pool
-    # 0.62  0.92  0.100   1.06   816%   dca proportioned to coinsize
-    # 0.35  0.77  0.100    rerun
-    # 0.38  0.87  0.100   1.06   817%   rerun
-    # 0.34  1.70  0.05   0.87   736%   perc 0.01 to 0.20 (2 decimals and doubled max)
-    # 0.19  1.65  0.05   0.87   735%   rerun
-    # 0.56  0.90  0.15   0.75   578%   replaced DOGE with LINK
-    # 0.45  0.92  0.15   5.28   581%   participation total needs to be weekly, not daily
-    # 0.46  0.92  0.15   5.93   651%   dropped DCA subtraction
-    # 0.33  0.55  0.15   6.18   654%   increased perc to 0.20
-    # 0.52  0.79  0.20   5.93   647%   rerun
-    # 0.34  0.77  0.17   6.03   653%   rerun
-    # 0.20  0.22  0.19   6.54   667%   rerun
-    # 0.30  0.90  0.10   5.86   644%   max perc of 20% WAY too volatile, bit slower.
-    # 0.30  1.65   4.73   567%   hardcoded perc to 1%
-    # 0.30  0.90   3.74   411%   added xlm
-    # 0.30  1.65   3.96   476%   added algo
-    # 0.20  1.65   3.96   475%   rerun
-    # 0.25  1.65   3.94   473%   rerun
-    # 0.40  0.90   5.37   586%   random 10 symbols with DOGE added back in
-    # 0.30  1.75   5.43   657%   added atom (13 total)
-    # 0.25  0.70   4.79   515%   added etc (14 total)
-    # 0.15  1.65   5.40   643%   rerun
-    # 0.50  1.70   5.16   620%   added VET (15 total)
-    # 0.40  1.80   5.10   618%   rerun
-    # 0.20  0.70   4.39   471%   added hbar (16 total)
-    # 0.15  1.70   4.84   581%   rerun bumped sigma to 4
-    # 0.80  1.75   4.99   604%   added theta (17 total)
-    # 0.60  1.70   5.17   621%   rerun bumped sigma to 5
-    # 0.15  1.70   5.13   615%   rerun
-    # 0.20  1.70   4.71   565%   added EOS (18 total)
-    # 0.85  1.60   4.76   567%   rerun (same sigma 5)
-    # 0.50  0.85   4.28   467%   rerun (sigma=4 due to high variance above)
-    # 0.11  0.42   4.44   466%   10/45 base is now multiplier
-    # 0.13  0.58   4.13   447%   15/75 rerun sigma=0.5
-    # 0.26  0.32   4.31   470%   25/80 rerun sigma=0.25
-    # 0.25  0.21   4.45   468%   25/50 rerun sigma=0.2
-    # 0.15  0.45   3.56   383%   15/70 added zec
-    # 0.14  0.30   3.83   399%   15/40 rerun sigma 0.3
-    # 0.10  0.67   3.60   384%   10/65 rerun sigma 0.15
-    # 0.19  0.20   3.83   400% ! 20/40 rerun sigma 0.1
-    # 0.11  0.36   3.79   396%   10/40 rerun 0.1
-    # 0.13  0.64   3.57   389%   15/85 rerun 0.2
+    # 2022 July 18
+    # 0.36  0.45   2.74 ! [35/160] leader
+    # 0.72  0.23   2.71   [70/165] rerun 0.5
+    # 0.25  0.34   2.29   [25/85] rerun 0.6
+    # 0.10  0.75   2.28   [10/75] rerun 0.3
+    # 0.10  0.68   2.23   [10/70] rerun 0.1
+    # 0.19  0.22   2.23   [20/40] rerun 0.2
+    # 0.10  0.70   2.23   [10/70] rerun 0.4
 
-    signal = 0.13
-    base_mul = 0.64
-    get_fitness(signal, base_mul)
+    # excluding ADA
+    # 0.35  0.44   2.36 ! [35/155] sigma 0.2
+    # 0.36  0.45   2.31   [35/160] leader
+    # 0.54  0.30   2.28   [55/160] sigma 1.5
+    # 0.67  0.25   2.23   [65/170] sigma 0.4
+    # 0.36  0.21   1.98   [35/75] sigma 0.6
+    # 0.10  0.73   1.95   [35/265] sigma 0.1
+    # 0.10  0.74   1.95   [10/75] sigma 2
+    # 0.38  0.21   1.94   [40/80] sigma 0.8
+    # 0.10  0.41   1.92   [10/40] sigma 0.3
+    # 0.34  0.20   1.91   [35/70] sigma 0.7
+    # 0.10  0.69   1.90   [10/70] sigma 1
+    # 0.11  0.58   1.82   [10/65] sigma 0.5
+
+    # added $100 weekly DCA
+    # 0.35  0.44  1.80 ! [35/155] leader
+    # 0.30  0.51  1.79   [30/155] s0.1
+    # 0.39  0.21  1.45   [40/80] s1
+    # 0.19  0.36  1.44   [20/70] s1.3
+    # 0.21  0.20  1.44   [20/40] s2
+    # 0.15  0.46  1.43   [15/70] s3
+    # 0.10  0.45  1.42   [10/45] s0.3
+    # 0.10  0.41  1.42   [10/40] s2.3
+    # 0.10  0.44  1.42   [10/45] s3.3
+
+    # week 2022 07 25
+    # 0.35  0.44  1.92 ! [35/155] leader
+    # 0.32  0.48  1.92   [30/155] sigma 0.03
+    # 0.30  0.52  1.92   [30/155] sigma 0.13
+    # 0.49  0.32  1.90   [50/155] sigma 0.33
+    # 0.36  0.45  1.88   [35/160] sigma 0.01
+    # 0.40  0.40  1.87   [40/160] sigma 0.1
+    # 0.14  0.28  1.55   [15/40] sigma 0.4
+    # 0.10  0.39  1.54   [10/40] sigma 0.2
+    # 0.14  0.50  1.54   [15/70] sigma 0.23
+    # 0.29  0.15  1.54   [30/45] sigma 0.3
+
+    # changed to cagr/m for score
+    # 0.20  0.40  33.24   [20/80] s0.3
+    # 0.20  0.40  33.24   [20/80] s1
+    # 0.20  0.40  33.24   [20/80] s3
+    # 0.20  0.40  33.24   [20/80] s5
+    # 0.35  0.44  31.12 ! [35/155] leader
+    # 0.20  0.77  31.11   [20/155] s2
+    # 0.36  0.42  29.76   [35/150] s0.01
+    # 0.33  0.46  29.76   [35/150] s0.03
+    # 0.38  0.40  29.70   [40/150] s0.1
+
+    # 1 aug new leader
+    # 0.20  0.40  33.15   [20/80] leader
+    # 0.20  0.40  33.15   [20/80] s0.03
+    # 0.20  0.40  33.15   [20/80] s0.04
+
+    # 8 aug new leader
+    # 0.20  0.40  33.10   [20/80] leader
+    # 0.20  0.41  33.10   [20/80] s.03
+    # 0.20  0.40  33.10   [20/80] s.1
+    # 0.20  0.40  33.10   [20/80] s.3
+    # 0.20  0.40  33.10   [20/80] s1
+    # 0.20  0.40  33.10   [20/80] s3
+
+    signal = 0.2
+    base_mul = 0.4
+    scores = []
+    lowered_symbols = [s.lower() for s in SYMBOLS if s not in ['MATIC', 'DOGE', 'THETA', 'ADA']]
+    for symbol in lowered_symbols:
+        scores.append(get_fitness(signal, base_mul, symbols=[symbol]))
+    logger.info(f'Mean score = {-np.array(scores).mean():,.2f}')
+    show_current_vote(signal, base_mul, lowered_symbols)
 
 
 def run_cma():
-    sigma = 0.2
+    sigma = 1
     cma_params = [
-        0.20,  # signal
-        0.40,  # base multiplier
+        0.2,  # signal
+        0.4,  # base multiplier
     ]
     logger.info(f'CMA settings: sigma={sigma}')
 
@@ -116,31 +106,25 @@ def run_cma():
     opts['timeout'] = 60 * 30
     opts['bounds'] = [
         [
-            10 / 100,  # signal min
-            2 / 10,  # base multiplier min
-            # 20 / 100,  # base min
-            # 0.01  # perc min
+            20 / 100,  # signal min
+            4 / 10,  # base multiplier min
         ],
         [
             100 / 100,  # signal max
-            10 / 10,  # base multiplier max
-            # 400 / 100,  # base max
-            # 0.10  # perc max
+            40 / 10,  # base multiplier max
         ]
     ]
+    symbols = deque([s.lower() for s in SYMBOLS if s not in ['MATIC', 'DOGE', 'THETA', 'ADA']])
     es = CMAEvolutionStrategy(cma_params, sigma, inopts=opts)
     while not es.stop():
-        solutions = es.ask()
+        symbols.rotate()
+        symbol = symbols[0]
         fitnesses = []
+        solutions = es.ask()
         for sol in solutions:
-            symbols = [s.lower() for s in SYMBOLS]
-            shuffle(symbols)
-            cut_symbols = symbols[:10]
-            fitness = get_fitness(*sol, symbols=sorted(cut_symbols))
+            fitness = get_fitness(*sol, symbols=[symbol])
             fitnesses.append(fitness)
         es.tell(solutions, fitnesses)
-        # sol_signal, sol_base, sol_perc = list(es.result[5])
-        # logger.info(f'Solution = Signal: {round(sol_signal*20)*5:.0f} Base: {round(sol_base*20)*5:.0f} Perc: {round(sol_perc, 2)*100:.0f}%')
         sol_signal, sol_base = list(es.result[5])
         logger.info(f'Solution = Signal: {round(sol_signal*20)*5:.0f} Base: {round(sol_base*10*sol_signal*20)*5:.0f}')
         es.disp()
@@ -154,16 +138,30 @@ def get_fitness(signal, base_mul, symbols=None):
     base = signal * base_mul * 10
     signal = int(round(signal * 20) * 5)
     base = int(round(base * 20) * 5)
+    dca = 100
+    withdraw = round(1200000 / 16.98 / 5200) * 100
+    withdrawn = 0
+    fee = 0.002
     perc = 0.01
-    invest = 20_000  # randint(10_000, 20_000)
+    invest = 20_000
+    invested = invest * 2
     cutoff = 100
     trades = 0
+    cycles = []
+    cycle = {
+        'current': None,
+        'previous': None,
+        'usd_start': invested,
+        'usd_end': invested,
+        'ticks': 0,
+    }
     coin_size = len(symbols)
     coin_usds = {s: 0 for s in symbols}
     coin_usds_print = {s: 0 for s in symbols}
     balances = {
         'usdt': invest,
     }
+    vote = None
 
     df = read_frame(
         Ticker.objects.all(),
@@ -188,39 +186,49 @@ def get_fitness(signal, base_mul, symbols=None):
             for symbol in symbols:
                 balances[symbol] = (invest / coin_size) / ticker[symbol]
 
-        # majority signal
-        greens = sum([ticker[f'signal_{s}'] > ticker[f'base_{s}'] for s in symbols])
-        upwards = (greens / coin_size) >= 0.50
+        # majority buy and sell signal
+        signal_triggers = sum([ticker[f'signal_{s}'] > ticker[f'base_{s}'] for s in symbols])
+        vote = (signal_triggers / coin_size) >= 0.50
         usdt_start = balances['usdt']
+
+        # add DCA
+        balances['usdt'] += dca
+        invested += dca
+
+        # WITHDRAW
+        # if balances['usdt'] > withdraw:
+        #     balances['usdt'] -= withdraw
+        #     withdrawn += withdraw
+        # else:
+        #     logger.info('Not enough money to withdraw!')
 
         # now trade for every symbol
         for symbol in symbols:
 
             # sell when green
-            if upwards:
+            if vote:
                 portion_coin = balances[symbol] * (perc / coin_size)
                 portion_usd = portion_coin * ticker[symbol]
-                # if portion_usd < cutoff:  # bump portion to cutoff if less
-                #     portion_usd = cutoff
-                #     portion_coin = cutoff / ticker[symbol]
+                if portion_usd < cutoff:  # bump portion to cutoff if less
+                    portion_usd = cutoff
+                    portion_coin = cutoff / ticker[symbol]
                 if balances[symbol] < portion_coin:
                     logger.debug(f'Not enough {portion_coin:.4f} to sell {symbol} [{balances[symbol]:.4f}]')
-                    continue
                 else:
                     balances[symbol] -= portion_coin
-                    balances['usdt'] += portion_usd
+                    balances['usdt'] += portion_usd * (1 - fee)
                     trades += 1
                     logger.debug(f'Selling {symbol} of {portion_usd}')
+
             # buy when red
             else:
                 portion_usd = balances['usdt'] * (perc / coin_size)
-                # if portion_usd < cutoff:
-                #     portion_usd = cutoff
+                if portion_usd < cutoff:
+                    portion_usd = cutoff
                 if balances['usdt'] < portion_usd:
                     logger.debug(f'Not enough {portion_usd:.1f} to buy {symbol} [{balances["usdt"]:.0f}]')
-                    continue
                 else:
-                    balances['usdt'] -= portion_usd
+                    balances['usdt'] -= portion_usd * (1 + fee)
                     balances[symbol] += portion_usd / ticker[symbol]
                     trades += 1
                     logger.debug(f'Buying {symbol} of {portion_usd}')
@@ -229,12 +237,55 @@ def get_fitness(signal, base_mul, symbols=None):
         coin_usds_print = {k: round(v) for k, v in coin_usds.items()}
         total_usd = balances['usdt'] + sum(coin_usds.values())
         trade = usdt_start - balances['usdt']
-        logger.debug(f'{day}  trade={trade:.0f}  TOTAL={total_usd:.0f}  RETURNS={coin_usds_print}')
+        logger.debug(f'{day}  trade={trade:,.0f}  TOTAL={total_usd:,.0f}  usdt={balances["usdt"]:,.0f}  coins={coin_usds_print}')
 
+        # cycle (True is selling/bull and False is buying/bear)
+        # end of cycle is when cycle goes to selling from buying crossover
+        cycle['previous'], cycle['current'] = cycle['current'], vote
+        cycle['ticks'] += 1
+        if cycle['previous'] is False and cycle['current'] is True:
+            cycle['usd_end'] = total_usd
+            cycle['profit'] = cycle['usd_end'] - cycle['usd_start']
+            cycle['cagr'] = cycle['profit'] ** (1 / cycle['ticks']) - 1
+            logger.debug(f'End of cycle: cagr/w = {cycle["cagr"]:,.2f} (debug={cycle})')
+            cycles.append(deepcopy(cycle))
+            cycle['usd_start'] = total_usd
+            cycle['ticks'] = 0
+
+    ticks = len(df) * len(symbols) // 7
+    part = trades / ticks
     total_return = sum(coin_usds.values()) + balances['usdt']
-    invested = invest * 2
-    roi = (total_return - invested) / invested
-    part = trades / (len(df) * len(SYMBOLS) / 7)
-    score = roi * part
-    logger.info(f'[{signal}/{base}] Score {score:.2f} from ROI {roi:.2f} with part {part:.2f} for return of {total_return:.0f} data={balances["usdt"]:.0f} {coin_usds_print}')
+    cagr = (total_return - invested) ** (1 / (ticks / 4)) - 1
+    if isinstance(cagr, complex):
+        cagr = cagr.real
+    score = (cagr * 100) * part
+    vote_sym = 'S' if vote else 'B'
+    logger.info(f'[{signal}/{base}-{vote_sym}] Score {score:.2f} from CAGR/m {cagr:,.2f} with part {part:.2f} for return of {total_return:,.0f} usdt={balances["usdt"]:,.0f} {coin_usds_print}')
+    # logger.debug(cycles)
     return -score
+
+
+def show_current_vote(signal, base_mul, symbols):
+    base = signal * base_mul * 10
+    signal = int(round(signal * 20) * 5)
+    base = int(round(base * 20) * 5)
+    coin_size = len(symbols)
+
+    df = read_frame(
+        Ticker.objects.all(),
+        index_col='tick_at', datetime_index=True)
+
+    # add sma to sf
+    for symbol in symbols:
+        df[f'signal_{symbol}'] = df[symbol].rolling(signal).mean()
+        df[f'base_{symbol}'] = df[symbol].rolling(base).mean()
+    last_row = df.iloc[-1]
+    last_date = df.index[-1].date()
+
+    # majority buy and sell signal
+    signal_triggers = sum(
+        [last_row[f'signal_{s}'] > last_row[f'base_{s}'] for s in symbols])
+    vote = (signal_triggers / coin_size) >= 0.50
+    act = 'Sell (in bull)' if vote else 'Buy (in bear)'
+
+    logger.info(f'{last_date} voted {act}')

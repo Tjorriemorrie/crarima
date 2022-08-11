@@ -29,12 +29,11 @@ class Ticker(models.Model):
     # bch = models.FloatField(null=True)
     etc = models.FloatField(null=True)
     vet = models.FloatField(null=True)
-    # mana = models.FloatField(null=True)
-    # flow = models.FloatField(null=True)
     hbar = models.FloatField(null=True)
     theta = models.FloatField(null=True)
     eos = models.FloatField(null=True)
     zec = models.FloatField(null=True)
+    # act = models.FloatField(null=True)
 
     arima = models.FloatField(null=True)
     garch = models.FloatField(null=True)
