@@ -1,4 +1,5 @@
 import logging
+import warnings
 from collections import deque
 from copy import deepcopy
 from itertools import combinations
@@ -15,6 +16,7 @@ from main.models import Ticker
 COMB_SIZE = 8
 
 logger = logging.getLogger(__name__)
+warnings.filterwarnings("error")
 
 exclude_coins = ['MATIC', 'DOGE', 'THETA', 'ADA']
 lowered_symbols = [s.lower() for s in SYMBOLS if s not in exclude_coins]
@@ -88,22 +90,24 @@ def run_sim():
     # 0.20  0.40  40.09   [20/80] s0.5
     # 0.20  0.41  40.09   [20/80] s1
 
-    # changed for multi symbol and only trading one symbol per week
-    # 0.20  0.40  53.94   [20/80] leader
+    # changed for multi symbol and only trading one symbol per week (x portfolio size)
+    # 0.20  0.40  55   [20/80] leader
+    # 0.20  0.40  55   [20/80] s0.05
+    # 0.20  0.40  55   [20/80] s0.1
+    # 0.20  0.40  55   [20/80] s0.5
 
     signal = 0.2
     base_mul = 0.4
     scores = []
-    combs = list(combinations(lowered_symbols, 8))
     shuffle(combs)
-    for symbols in combs[:10]:
+    for symbols in combs[:30]:
         scores.append(get_fitness(signal, base_mul, symbols=symbols))
-    logger.info(f'Mean score = {-np.array(scores).mean():,.2f}')
+    logger.info(f'Mean score = {-np.array(scores).mean():,.0f}')
     show_current_vote(signal, base_mul, lowered_symbols)
 
 
 def run_cma():
-    sigma = 1
+    sigma = 0.5
     cma_params = [
         0.2,  # signal
         0.4,  # base multiplier
@@ -214,7 +218,7 @@ def get_fitness(signal, base_mul, symbols=None):
         # sell when green
         if vote:
             sell_symbol = max(coin_usds, key=coin_usds.get)
-            portion_coin = balances[sell_symbol] * perc
+            portion_coin = balances[sell_symbol] * (perc * len(symbols))
             portion_usd = portion_coin * ticker[sell_symbol]
             if portion_usd < cutoff:  # bump portion to cutoff if less
                 portion_usd = cutoff
@@ -254,7 +258,7 @@ def get_fitness(signal, base_mul, symbols=None):
         if cycle['previous'] is False and cycle['current'] is True:
             cycle['usd_end'] = total_usd
             cycle['profit'] = cycle['usd_end'] - cycle['usd_start']
-            cycle['cagr'] = cycle['profit'] ** (1 / cycle['ticks']) - 1
+            cycle['cagr'] = round(cycle['profit']) ** (1 / cycle['ticks']) - 1
             logger.debug(f'End of cycle: cagr/w = {cycle["cagr"]:,.2f} (debug={cycle})')
             cycles.append(deepcopy(cycle))
             cycle['usd_start'] = total_usd
@@ -263,7 +267,7 @@ def get_fitness(signal, base_mul, symbols=None):
     ticks = len(df) // 7
     part = trades / ticks
     total_return = sum(coin_usds.values()) + balances['usdt']
-    cagr = (total_return - invested) ** (1 / (ticks / 52)) - 1
+    cagr = round(total_return - invested) ** (1 / (ticks / 52)) - 1
     if isinstance(cagr, complex):
         cagr = cagr.real
     score = cagr * part
