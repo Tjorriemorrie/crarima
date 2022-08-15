@@ -13,7 +13,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         logger.info('Running CMA')
 
-        # run_cma()
-        run_sim()
+        run_cma()
+        # run_sim()
 
         logger.info('done')

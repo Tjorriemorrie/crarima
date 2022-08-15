@@ -1,6 +1,8 @@
 import logging
 from collections import deque
 from copy import deepcopy
+from itertools import combinations
+from random import shuffle
 
 import numpy as np
 import pandas as pd
@@ -10,7 +12,13 @@ from django_pandas.io import read_frame
 from main.alphavantage import SYMBOLS
 from main.models import Ticker
 
+COMB_SIZE = 8
+
 logger = logging.getLogger(__name__)
+
+exclude_coins = ['MATIC', 'DOGE', 'THETA', 'ADA']
+lowered_symbols = [s.lower() for s in SYMBOLS if s not in exclude_coins]
+combs = list(combinations(lowered_symbols, COMB_SIZE))
 
 
 def run_sim():
@@ -84,12 +92,21 @@ def run_sim():
     # 0.20  0.40  33.10   [20/80] s1
     # 0.20  0.40  33.10   [20/80] s3
 
+    # cagr changed to annual
+    # 0.20  0.40  40.09   [20/80] leader
+    # 0.20  0.40  40.09   [20/80] s0.5
+    # 0.20  0.41  40.09   [20/80] s1
+
     signal = 0.2
     base_mul = 0.4
     scores = []
-    lowered_symbols = [s.lower() for s in SYMBOLS if s not in ['MATIC', 'DOGE', 'THETA', 'ADA']]
-    for symbol in lowered_symbols:
-        scores.append(get_fitness(signal, base_mul, symbols=[symbol]))
+    # for symbol in lowered_symbols:
+    #     scores.append(get_fitness(signal, base_mul, symbols=[symbol]))
+    # logger.info(f'Mean score = {-np.array(scores).mean():,.2f}')
+    combs = list(combinations(lowered_symbols, 8))
+    shuffle(combs)
+    for symbols in combs[:10]:
+        scores.append(get_fitness(signal, base_mul, symbols=symbols))
     logger.info(f'Mean score = {-np.array(scores).mean():,.2f}')
     show_current_vote(signal, base_mul, lowered_symbols)
 
@@ -114,15 +131,14 @@ def run_cma():
             40 / 10,  # base multiplier max
         ]
     ]
-    symbols = deque([s.lower() for s in SYMBOLS if s not in ['MATIC', 'DOGE', 'THETA', 'ADA']])
     es = CMAEvolutionStrategy(cma_params, sigma, inopts=opts)
     while not es.stop():
-        symbols.rotate()
-        symbol = symbols[0]
+        shuffle(combs)
+        symbols = combs[0]
         fitnesses = []
         solutions = es.ask()
         for sol in solutions:
-            fitness = get_fitness(*sol, symbols=[symbol])
+            fitness = get_fitness(*sol, symbols=symbols)
             fitnesses.append(fitness)
         es.tell(solutions, fitnesses)
         sol_signal, sol_base = list(es.result[5])
@@ -143,8 +159,8 @@ def get_fitness(signal, base_mul, symbols=None):
     withdrawn = 0
     fee = 0.002
     perc = 0.01
-    invest = 20_000
-    invested = invest * 2
+    invest = 10_000
+    invested = invest * 4
     cutoff = 100
     trades = 0
     cycles = []
@@ -159,9 +175,8 @@ def get_fitness(signal, base_mul, symbols=None):
     coin_usds = {s: 0 for s in symbols}
     coin_usds_print = {s: 0 for s in symbols}
     balances = {
-        'usdt': invest,
+        'usdt': invest * 3,
     }
-    vote = None
 
     df = read_frame(
         Ticker.objects.all(),
@@ -255,12 +270,11 @@ def get_fitness(signal, base_mul, symbols=None):
     ticks = len(df) * len(symbols) // 7
     part = trades / ticks
     total_return = sum(coin_usds.values()) + balances['usdt']
-    cagr = (total_return - invested) ** (1 / (ticks / 4)) - 1
+    cagr = (total_return - invested) ** (1 / (ticks / 52)) - 1
     if isinstance(cagr, complex):
         cagr = cagr.real
-    score = (cagr * 100) * part
-    vote_sym = 'S' if vote else 'B'
-    logger.info(f'[{signal}/{base}-{vote_sym}] Score {score:.2f} from CAGR/m {cagr:,.2f} with part {part:.2f} for return of {total_return:,.0f} usdt={balances["usdt"]:,.0f} {coin_usds_print}')
+    score = cagr * part
+    logger.info(f'[{signal}/{base}] Score {score:.2f} from CAGR {cagr:,.0f} with part {part:.2f} for return of {total_return:,.0f} usdt={balances["usdt"]:,.0f} {coin_usds_print}')
     # logger.debug(cycles)
     return -score
 
