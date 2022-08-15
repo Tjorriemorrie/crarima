@@ -22,15 +22,6 @@ combs = list(combinations(lowered_symbols, COMB_SIZE))
 
 
 def run_sim():
-    # 2022 July 18
-    # 0.36  0.45   2.74 ! [35/160] leader
-    # 0.72  0.23   2.71   [70/165] rerun 0.5
-    # 0.25  0.34   2.29   [25/85] rerun 0.6
-    # 0.10  0.75   2.28   [10/75] rerun 0.3
-    # 0.10  0.68   2.23   [10/70] rerun 0.1
-    # 0.19  0.22   2.23   [20/40] rerun 0.2
-    # 0.10  0.70   2.23   [10/70] rerun 0.4
-
     # excluding ADA
     # 0.35  0.44   2.36 ! [35/155] sigma 0.2
     # 0.36  0.45   2.31   [35/160] leader
@@ -97,12 +88,12 @@ def run_sim():
     # 0.20  0.40  40.09   [20/80] s0.5
     # 0.20  0.41  40.09   [20/80] s1
 
+    # changed for multi symbol and only trading one symbol per week
+    # 0.20  0.40  53.94   [20/80] leader
+
     signal = 0.2
     base_mul = 0.4
     scores = []
-    # for symbol in lowered_symbols:
-    #     scores.append(get_fitness(signal, base_mul, symbols=[symbol]))
-    # logger.info(f'Mean score = {-np.array(scores).mean():,.2f}')
     combs = list(combinations(lowered_symbols, 8))
     shuffle(combs)
     for symbols in combs[:10]:
@@ -159,8 +150,8 @@ def get_fitness(signal, base_mul, symbols=None):
     withdrawn = 0
     fee = 0.002
     perc = 0.01
-    invest = 10_000
-    invested = invest * 4
+    invest = 20_000
+    invested = invest * 2
     cutoff = 100
     trades = 0
     cycles = []
@@ -175,7 +166,7 @@ def get_fitness(signal, base_mul, symbols=None):
     coin_usds = {s: 0 for s in symbols}
     coin_usds_print = {s: 0 for s in symbols}
     balances = {
-        'usdt': invest * 3,
+        'usdt': invest * 1,
     }
 
     df = read_frame(
@@ -217,36 +208,38 @@ def get_fitness(signal, base_mul, symbols=None):
         # else:
         #     logger.info('Not enough money to withdraw!')
 
-        # now trade for every symbol
-        for symbol in symbols:
+        # trade only highest/lowest symbol
+        coin_usds = {s: balances[s] * ticker[s] for s in symbols}
 
-            # sell when green
-            if vote:
-                portion_coin = balances[symbol] * (perc / coin_size)
-                portion_usd = portion_coin * ticker[symbol]
-                if portion_usd < cutoff:  # bump portion to cutoff if less
-                    portion_usd = cutoff
-                    portion_coin = cutoff / ticker[symbol]
-                if balances[symbol] < portion_coin:
-                    logger.debug(f'Not enough {portion_coin:.4f} to sell {symbol} [{balances[symbol]:.4f}]')
-                else:
-                    balances[symbol] -= portion_coin
-                    balances['usdt'] += portion_usd * (1 - fee)
-                    trades += 1
-                    logger.debug(f'Selling {symbol} of {portion_usd}')
-
-            # buy when red
+        # sell when green
+        if vote:
+            sell_symbol = max(coin_usds, key=coin_usds.get)
+            portion_coin = balances[sell_symbol] * perc
+            portion_usd = portion_coin * ticker[sell_symbol]
+            if portion_usd < cutoff:  # bump portion to cutoff if less
+                portion_usd = cutoff
+                portion_coin = cutoff / ticker[sell_symbol]
+            if balances[sell_symbol] < portion_coin:
+                logger.debug(f'Not enough {portion_coin:.4f} to sell {sell_symbol} [{balances[sell_symbol]:.4f}]')
             else:
-                portion_usd = balances['usdt'] * (perc / coin_size)
-                if portion_usd < cutoff:
-                    portion_usd = cutoff
-                if balances['usdt'] < portion_usd:
-                    logger.debug(f'Not enough {portion_usd:.1f} to buy {symbol} [{balances["usdt"]:.0f}]')
-                else:
-                    balances['usdt'] -= portion_usd * (1 + fee)
-                    balances[symbol] += portion_usd / ticker[symbol]
-                    trades += 1
-                    logger.debug(f'Buying {symbol} of {portion_usd}')
+                balances[sell_symbol] -= portion_coin
+                balances['usdt'] += portion_usd * (1 - fee)
+                trades += 1
+                logger.debug(f'Selling {sell_symbol} of {portion_usd}')
+
+        # buy when red
+        else:
+            buy_symbol = min(coin_usds, key=coin_usds.get)
+            portion_usd = balances['usdt'] * perc
+            if portion_usd < cutoff:
+                portion_usd = cutoff
+            if balances['usdt'] < portion_usd:
+                logger.debug(f'Not enough {portion_usd:.1f} to buy {buy_symbol} [{balances["usdt"]:.0f}]')
+            else:
+                balances['usdt'] -= portion_usd * (1 + fee)
+                balances[buy_symbol] += portion_usd / ticker[buy_symbol]
+                trades += 1
+                logger.debug(f'Buying {buy_symbol} of {portion_usd}')
 
         coin_usds = {s: balances[s] * ticker[s] for s in symbols}
         coin_usds_print = {k: round(v) for k, v in coin_usds.items()}
@@ -267,7 +260,7 @@ def get_fitness(signal, base_mul, symbols=None):
             cycle['usd_start'] = total_usd
             cycle['ticks'] = 0
 
-    ticks = len(df) * len(symbols) // 7
+    ticks = len(df) // 7
     part = trades / ticks
     total_return = sum(coin_usds.values()) + balances['usdt']
     cagr = (total_return - invested) ** (1 / (ticks / 52)) - 1
