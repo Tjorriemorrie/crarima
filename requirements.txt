@@ -1,6 +1,11 @@
-django==4.0.4
-requests==2.27.1
-django_pandas==0.6.6  # installs numpy and pandas
-pmdarima==1.8.5  # installs scipy, scikit-learn, statsmodels
+# app
 arch==4.19.0
 cma==3.2.2
+django==4.0.4
+environs==11.0.0
+django_pandas==0.6.6  # installs numpy and pandas
+pmdarima==2.0.4  # installs scipy, scikit-learn, statsmodels
+requests==2.27.1
+
+# options
+ccxt==4.2.71

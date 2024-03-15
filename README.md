@@ -1,2 +1,3 @@
 # crarima
-crypto arima bot
+
+crypto arima usage for btc

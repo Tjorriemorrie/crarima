@@ -13,6 +13,12 @@ import sys
 from os import getenv
 from pathlib import Path
 
+from environs import Env
+
+env = Env()
+env.read_env()
+
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -21,10 +27,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-le=a0x6(%3ag69+#)t(o(s4qxj$3w+5y)1v60b%@d+rj4fwfez'
+SECRET_KEY = env('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env.bool('DEBUG')
 
 ALLOWED_HOSTS = []
 
@@ -42,6 +48,7 @@ INSTALLED_APPS = [
     'main.apps.MainConfig',
     'kc.apps.KcConfig',
     'to.apps.ToConfig',
+    'options.apps.OptionsConfig',
 ]
 
 MIDDLEWARE = [
@@ -129,6 +136,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 # logging
+LOG_LEVEL = 'DEBUG' if DEBUG else 'INFO'
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -141,48 +149,10 @@ LOGGING = {
         }
     },
     'handlers': {
-        'django': {
-            'level': 'DEBUG',
-            # 'class': 'logging.StreamHandler',
+        'file': {
+            'level': LOG_LEVEL,
             'class': 'logging.handlers.TimedRotatingFileHandler',
-            'filename': BASE_DIR / 'logs' / 'django.log',
-            'when': 'midnight',
-            'backupCount': 7,
-            'delay': True,
-            'formatter': 'standard',
-        },
-        'default': {
-            'level': 'DEBUG',
-            # 'class': 'logging.StreamHandler',
-            'class': 'logging.handlers.TimedRotatingFileHandler',
-            'filename': BASE_DIR / 'logs' / 'default.log',
-            'when': 'midnight',
-            'backupCount': 7,
-            'delay': True,
-            'formatter': 'standard',
-        },
-        'main': {
-            'level': 'DEBUG',
-            'class': 'logging.handlers.TimedRotatingFileHandler',
-            'filename': BASE_DIR / 'logs' / 'main.log',
-            'when': 'midnight',
-            'backupCount': 7,
-            'delay': True,
-            'formatter': 'standard',
-        },
-        'kc': {
-            'level': 'DEBUG',
-            'class': 'logging.handlers.TimedRotatingFileHandler',
-            'filename': BASE_DIR / 'logs' / 'kc.log',
-            'when': 'midnight',
-            'backupCount': 7,
-            'delay': True,
-            'formatter': 'standard',
-        },
-        'to': {
-            'level': 'DEBUG',
-            'class': 'logging.handlers.TimedRotatingFileHandler',
-            'filename': BASE_DIR / 'logs' / 'to.log',
+            'filename': BASE_DIR / 'logs' / 'crarima.log',
             'when': 'midnight',
             'backupCount': 7,
             'delay': True,
@@ -195,39 +165,24 @@ LOGGING = {
             'formatter': 'compact',
         },
     },
+    'root': {
+        'handlers': ['file', 'console'],
+        'level': LOG_LEVEL,
+        'propagate': False,
+    },
     'loggers': {
-        '': {
-            'handlers': ['console'],
+        'django': {  # change to let root handle everything
+            'handlers': [],
             'level': 'DEBUG',
             'propagate': True,
         },
-        'main': {
-            'handlers': ['default', 'console'],
-            'level': 'DEBUG',
-            'propagate': False,
-        },
-        'kc': {
-            'handlers': ['kc', 'console'],
-            'level': 'DEBUG',
-            'propagate': False,
-        },
-        'to': {
-            'handlers': ['to', 'console'],
-            'level': 'DEBUG',
-            'propagate': False,
-        },
-        'django': {
-            'handlers': ['django'],
-            'level': 'DEBUG',
-            'propagate': False,
-        }
     }
 }
 
 
 KUCOIN_CREDS_SANDBOX = {
     'is_sandbox': True,
-    'key': getenv('KUCOIN_KEY'),
-    'secret': getenv('KUCOIN_SECRET'),
-    'passphrase': getenv('KUCOIN_PASSPHRASE'),
+    'key': env('KUCOIN_KEY'),
+    'secret': env('KUCOIN_SECRET'),
+    'passphrase': env('KUCOIN_PASSPHRASE'),
 }
